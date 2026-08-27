@@ -119,17 +119,41 @@ export default function App() {
 
   // Price List Handlers
   const applyPriceList = (index) => {
-    setActiveListIndex(index);
-    setActiveListName(priceLists[index].name);
-    setDraft(prev => ({ ...prev, chalni_rate: [...priceLists[index].rates] }));
+    if (index === -1) {
+      // "Create new" selected
+      setActiveListIndex(-1);
+      setActiveListName(""); 
+      // Keep current draft.chalni_rate so user can save them as a new list
+    } else {
+      // Existing list selected
+      setActiveListIndex(index);
+      setActiveListName(priceLists[index].name);
+      setDraft(prev => ({ ...prev, chalni_rate: [...priceLists[index].rates] }));
+    }
   };
 
   const saveCurrentRatesToActiveList = () => {
     const newLists = [...priceLists];
-    newLists[activeListIndex] = {
-      name: activeListName || `List ${activeListIndex + 1}`,
-      rates: [...draft.chalni_rate]
-    };
+    const savedName = activeListName.trim() || `New List ${newLists.length + 1}`;
+
+    if (activeListIndex === -1) {
+      // Add a completely new list to the array
+      newLists.push({
+        name: savedName,
+        rates: [...draft.chalni_rate]
+      });
+      // Point index to the newly created list
+      setActiveListIndex(newLists.length - 1);
+      setActiveListName(savedName);
+    } else {
+      // Update existing list
+      newLists[activeListIndex] = {
+        name: savedName,
+        rates: [...draft.chalni_rate]
+      };
+      setActiveListName(savedName); // Sync name in case it was modified
+    }
+
     setPriceLists(newLists);
     localStorage.setItem("rel-pricelists", JSON.stringify(newLists));
     
@@ -420,11 +444,12 @@ export default function App() {
               {priceLists.map((list, i) => (
                 <option key={i} value={i}>{list.name}</option>
               ))}
+              <option value={-1}>-- Create new --</option>
             </select>
           </div>
           <div className="pf" style={{ minWidth: "170px" }}>
             <label>List name</label>
-            <input type="text" value={activeListName} onChange={(e) => setActiveListName(e.target.value)} />
+            <input type="text" value={activeListName} onChange={(e) => setActiveListName(e.target.value)} placeholder="Type new list name..." />
           </div>
           <button className="btn" type="button" onClick={saveCurrentRatesToActiveList}>Save current rates to list</button>
           <span className="hint" style={{ marginLeft: 0 }}>{toast}</span>
