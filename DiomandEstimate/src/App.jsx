@@ -51,21 +51,34 @@ export default function App() {
   const [toast, setToast] = useState("");
   const fileInputRef = useRef(null);
 
-  // Load from LocalStorage on mount
+  // Load Draft from LocalStorage & Price Lists from MongoDB on mount
   useEffect(() => {
     try {
       const savedDraft = localStorage.getItem("rel-draft");
       const savedPhoto = localStorage.getItem("rel-photo");
-      const savedLists = localStorage.getItem("rel-pricelists");
-      
       if (savedDraft) setDraft(JSON.parse(savedDraft));
       if (savedPhoto) setPhoto(savedPhoto);
-      if (savedLists) {
-        const parsed = JSON.parse(savedLists);
-        setPriceLists(parsed);
-        setActiveListName(parsed[0].name);
+    } catch (e) { console.error("Could not load local save data"); }
+
+    const fetchPriceLists = async () => {
+      try {
+        const response = await fetch("http://localhost:5000/api/pricelists");
+        const dbLists = await response.json();
+        
+        if (dbLists && dbLists.length > 0) {
+          setPriceLists(dbLists);
+          if (activeListIndex !== -1) {
+            setActiveListIndex(0);
+            setActiveListName(dbLists[0].name);
+            setDraft(prev => ({ ...prev, chalni_rate: [...dbLists[0].rates] }));
+          }
+        }
+      } catch (error) {
+        console.error("Could not fetch price lists from MongoDB:", error);
       }
-    } catch (e) { console.error("Could not load save data"); }
+    };
+    
+    fetchPriceLists();
   }, []);
 
   // Auto-Save Draft to LocalStorage
@@ -74,20 +87,17 @@ export default function App() {
     localStorage.setItem("rel-photo", photo);
   }, [draft, photo]);
 
-  // Standard input handler
   const handleChange = (e) => {
     const { name, value } = e.target;
     setDraft(prev => ({ ...prev, [name]: value }));
   };
 
-  // Chalni Table specific handlers
   const handleChalniChange = (index, field, value) => {
     const newArray = [...draft[field]];
     newArray[index] = value;
     setDraft(prev => ({ ...prev, [field]: newArray }));
   };
 
-  // Image Processor (Canvas resizing)
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (!file || !/^image\//.test(file.type)) return;
@@ -117,85 +127,147 @@ export default function App() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  // Price List Handlers
   const applyPriceList = (index) => {
     if (index === -1) {
-      // "Create new" selected
       setActiveListIndex(-1);
       setActiveListName(""); 
-      // Keep current draft.chalni_rate so user can save them as a new list
     } else {
-      // Existing list selected
       setActiveListIndex(index);
       setActiveListName(priceLists[index].name);
       setDraft(prev => ({ ...prev, chalni_rate: [...priceLists[index].rates] }));
     }
   };
 
-  const saveCurrentRatesToActiveList = () => {
-    const newLists = [...priceLists];
-    const savedName = activeListName.trim() || `New List ${newLists.length + 1}`;
-
-    if (activeListIndex === -1) {
-      // Add a completely new list to the array
-      newLists.push({
-        name: savedName,
-        rates: [...draft.chalni_rate]
-      });
-      // Point index to the newly created list
-      setActiveListIndex(newLists.length - 1);
-      setActiveListName(savedName);
-    } else {
-      // Update existing list
-      newLists[activeListIndex] = {
-        name: savedName,
-        rates: [...draft.chalni_rate]
-      };
-      setActiveListName(savedName); // Sync name in case it was modified
-    }
-
-    setPriceLists(newLists);
-    localStorage.setItem("rel-pricelists", JSON.stringify(newLists));
+  // --- SAVE LOGIC ---
+  const saveCurrentRatesToActiveList = async () => {
+    const savedName = activeListName.trim() || `New List ${priceLists.length + 1}`;
     
-    setToast("Rates saved!");
-    setTimeout(() => setToast(""), 2000);
+    const isDuplicate = priceLists.some((list, index) => {
+      return list.name.toLowerCase() === savedName.toLowerCase() && index !== activeListIndex;
+    });
+
+    if (isDuplicate) {
+      setToast("Error: List name already exists!");
+      setTimeout(() => setToast(""), 3000);
+      return;
+    }
+    
+    try {
+      if (activeListIndex === -1) {
+        const response = await fetch("http://localhost:5000/api/pricelists", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: savedName, rates: draft.chalni_rate })
+        });
+        
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || "Failed to create list");
+        
+        const newLists = [...priceLists, data];
+        setPriceLists(newLists);
+        setActiveListIndex(newLists.length - 1);
+        setActiveListName(newLists[newLists.length - 1].name);
+        
+      } else {
+        const listToUpdate = priceLists[activeListIndex];
+        
+        if (!listToUpdate._id) {
+            setToast("Error: Missing database ID.");
+            return;
+        }
+
+        const response = await fetch(`http://localhost:5000/api/pricelists/${listToUpdate._id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: savedName, rates: draft.chalni_rate })
+        });
+        
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || "Failed to update list");
+        
+        const newLists = [...priceLists];
+        newLists[activeListIndex] = data;
+        setPriceLists(newLists);
+        setActiveListName(data.name);
+      }
+
+      setToast("Rates saved successfully!");
+      setTimeout(() => setToast(""), 2000);
+
+    } catch (error) {
+      console.error("Error saving to database:", error);
+      setToast(error.message || "Database error!");
+      setTimeout(() => setToast(""), 3000);
+    }
   };
 
-  // Toolbar Actions
+  // --- DELETE LOGIC ---
+  const deleteActiveList = async () => {
+    if (activeListIndex === -1) return; // Can't delete "Create new"
+
+    const listToDelete = priceLists[activeListIndex];
+    
+    if (!listToDelete._id) {
+      setToast("Error: Missing database ID.");
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to permanently delete "${listToDelete.name}"?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`http://localhost:5000/api/pricelists/${listToDelete._id}`, {
+        method: "DELETE"
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.message || "Failed to delete list");
+      }
+
+      // Remove from state
+      const newLists = priceLists.filter((_, idx) => idx !== activeListIndex);
+      setPriceLists(newLists);
+
+      // Adjust active index
+      if (newLists.length > 0) {
+        setActiveListIndex(0);
+        setActiveListName(newLists[0].name);
+        setDraft(prev => ({ ...prev, chalni_rate: [...newLists[0].rates] }));
+      } else {
+        // If all lists are deleted, revert to "Create new" mode
+        setActiveListIndex(-1);
+        setActiveListName("");
+      }
+
+      setToast("List deleted successfully!");
+      setTimeout(() => setToast(""), 2000);
+
+    } catch (error) {
+      console.error("Error deleting list:", error);
+      setToast(error.message || "Database error!");
+      setTimeout(() => setToast(""), 3000);
+    }
+  };
+
   const loadSample = () => setDraft(SAMPLE_DRAFT);
   const resetEstimate = () => { setDraft(INITIAL_DRAFT); removeImage(); };
   
-  // Custom Print Function for Unique PDF Name
   const printPage = () => {
     const originalTitle = document.title;
-    
-    // Generate timestamp
     const now = new Date();
     const timeStr = `${now.getHours()}-${now.getMinutes()}-${now.getSeconds()}`;
+    const fileName = [draft.tag, draft.code, draft.date, draft.karat, timeStr].filter(Boolean).join("_");
     
-    // Create unique file name, filtering out empty fields
-    const fileName = [
-      draft.tag,
-      draft.code,
-      draft.date,
-      draft.karat,
-      timeStr
-    ].filter(Boolean).join("_");
-    
-    // Temporarily set document title to the new file name
     document.title = fileName || "Rough_Estimate_Ledger";
-    
     window.print();
     
-    // Restore the original title shortly after
-    setTimeout(() => {
-      document.title = originalTitle;
-    }, 1000);
+    setTimeout(() => { document.title = originalTitle; }, 1000);
   };
 
   // ================== MATH / CALCULATIONS ==================
   
-  // Gold Calculations
   const gross = toNum(draft.gross);
   const net = toNum(draft.net);
   const netpct = toNum(draft.netpct);
@@ -207,7 +279,6 @@ export default function App() {
   const fineSub = netFine + wasteFine;
   const totalFine = fineSub + (fineSub * toNum(draft.goldmargin) / 100);
 
-  // Chalni Array Calculations
   let chTotWt = 0;
   let chTotAmt = 0;
   const chalniRows = CHALNI_LABELS.map((label, i) => {
@@ -220,17 +291,15 @@ export default function App() {
   });
   const chAvgRate = chTotWt > 0 ? chTotAmt / chTotWt : 0;
 
-  // Stones & Labour
   const diaAmt = Math.round(toNum(draft.dia_wt) * toNum(draft.dia_rate));
   const rcepAmt = Math.round(toNum(draft.rcep_wt) * toNum(draft.rcep_rate));
   const otherAmt = Math.round(toNum(draft.other_wt) * toNum(draft.other_rate));
   const csAmt = Math.round(toNum(draft.cs_wt) * toNum(draft.cs_rate));
   
-  const labWt = net + wastewt; // Labour applied to Gold Net + Kundan wastage
+  const labWt = net + wastewt;
   const labAmt = Math.round(labWt * toNum(draft.lab_rate));
   const piroiAmt = Math.round(toNum(draft.piroi));
 
-  // Totals
   const stoneTotal = chTotAmt + diaAmt + rcepAmt + otherAmt + csAmt;
   const costingSubtotal = stoneTotal + labAmt + piroiAmt;
   
@@ -239,10 +308,8 @@ export default function App() {
   
   const grandTotal = costingSubtotal + marginAmt - toNum(draft.discount);
 
-  // Hidden Code logic
   const codeValue = toNum(draft.code) * 1000;
   const discodeText = codeValue > 0 ? ((grandTotal / codeValue) * 100).toFixed(2) + "%" : "—";
-
 
   return (
     <div className="sheet">
@@ -452,7 +519,13 @@ export default function App() {
             <input type="text" value={activeListName} onChange={(e) => setActiveListName(e.target.value)} placeholder="Type new list name..." />
           </div>
           <button className="btn" type="button" onClick={saveCurrentRatesToActiveList}>Save current rates to list</button>
-          <span className="hint" style={{ marginLeft: 0 }}>{toast}</span>
+          
+          {/* New Delete Button (Only shows if an existing list is selected) */}
+          {activeListIndex !== -1 && (
+            <button className="btn" style={{ borderColor: 'var(--ruby)', color: 'var(--ruby)' }} type="button" onClick={deleteActiveList}>Delete list</button>
+          )}
+
+          <span className="hint" style={{ marginLeft: 0, color: toast.includes('Error') ? 'var(--ruby)' : 'var(--emerald)', fontWeight: 600 }}>{toast}</span>
         </div>
 
         <div className="panel" style={{ padding: "6px 4px", overflowX: "auto" }}>
@@ -495,7 +568,7 @@ export default function App() {
         </div>
       </div>
       
-      <footer className="foot no-print">Rough Estimate Ledger — all data is stored locally in your browser.</footer>
+      <footer className="foot no-print">Rough Estimate Ledger — Local drafts. Lists synced to DB.</footer>
     </div>
   );
 }
