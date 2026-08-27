@@ -342,7 +342,7 @@ export default function App() {
         <div className={`plate-photo ${photo ? 'has-photo' : ''}`}>
           <input type="file" accept="image/*" style={{ display: 'none' }} ref={fileInputRef} onChange={handleImageUpload} />
           <div className="photo-frame" onClick={() => fileInputRef.current.click()}>
-            {photo ? <img src={photo} alt="Jewelry Item" /> : <span className="photo-plus">+</span>}
+            {photo ? <img src={photo} alt="Jewelry Item" /> : <span className="photo-plus" style={{ textAlign: 'center', lineHeight: '1.2' }}>+ <br /><span style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Add image</span></span>}
           </div>
           {photo && <button type="button" className="photo-remove-btn" onClick={removeImage}>×</button>}
         </div>
