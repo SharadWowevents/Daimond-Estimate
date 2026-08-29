@@ -27,10 +27,10 @@ const SAMPLE_DRAFT = {
 };
 
 const INITIAL_PRICE_LISTS = [
-  { name: "List RW", rates: [...DEFAULT_RATES] },
-  { name: "List RB", rates: [...DEFAULT_RATES] },
-  { name: "List Wholesale", rates: [...DEFAULT_RATES] },
-  { name: "List D", rates: [...DEFAULT_RATES] }
+  // { name: "List RW", rates: [...DEFAULT_RATES] },
+  // { name: "List RB", rates: [...DEFAULT_RATES] },
+  // { name: "List Wholesale", rates: [...DEFAULT_RATES] },
+  // { name: "List D", rates: [...DEFAULT_RATES] }
 ];
 
 // Helper Math Functions
