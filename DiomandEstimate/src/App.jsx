@@ -565,7 +565,7 @@ export default function App() {
         </div>
       </div>
       
-      <footer className="foot no-print">Rough Estimate Ledger — Local drafts. Lists synced to DB.</footer>
+      
     </div>
   );
 }
