@@ -187,21 +187,84 @@ table.sizing tfoot td.amt { color: var(--gold); font-size: 14.5px; }
 footer.foot { margin-top: 30px; font-size: 11px; color: var(--ink-faint); text-align: center; }
 
 @media print {
-  :root { --paper: #fff; --paper-raised: #fff; --paper-sunk: #f4f4f4; --ink: #111; --ink-soft: #333; --ink-faint: #666; --emerald-soft: transparent; --gold-soft: transparent; --ruby-soft: transparent; --shadow: none; }
-  @page { margin: 12mm; }
-  body { font-size: 11.5px; background: #fff; }
-  .toolbar, .pricelist-bar, footer.foot, .photo-remove-btn { display: none !important; }
-  .sheet { padding: 0; max-width: none; }
-  .plate, .panel, .stamp { box-shadow: none; break-inside: avoid; }
-  .rows input, table.sizing input { border-bottom: none; color: var(--ink); }
-  .rows tr.grandtotal td, .stamp-row.highlight { background: var(--paper-sunk) !important; color: var(--ink) !important; }
-  .stamp-row.highlight .k, .stamp-row.highlight .v { color: var(--ink) !important; }
-  .no-print { display: none !important; }
-  .plate-photo:not(.has-photo) { display: none; }
+  /* 1. Comfortable A4 margins */
+  @page {
+    size: A4 portrait;
+    margin: 8mm; 
+  }
+
+  /* 2. Hide UI elements */
+  .no-print, .pricelist-bar, .toolbar, .photo-remove-btn, footer {
+    display: none !important;
+  }
+
+  /* 3. Reset wrapper */
+  body, html {
+    background: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
   
-  /* Forces the specified section to always start on a new page when printing */
-  .page-break { 
-    page-break-before: always; 
-    break-before: page; 
+  .sheet {
+    box-shadow: none !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    zoom: 1 !important; 
+    font-size: 11px !important; 
+  }
+
+  /* 4. Keep grid columns side-by-side */
+  .grid2 {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 10px !important;
+  }
+
+  /* 5. Ultra-tight spacing between sections */
+  .section {
+    margin-top: 4px !important;
+    margin-bottom: 2px !important;
+  }
+  
+  .plate {
+    padding: 6px 8px !important;
+    margin-bottom: 4px !important;
+  }
+
+  /* Pull the summary stamp tight against the tables */
+  .stamp {
+    margin-top: 0px !important;
+    padding-top: 4px !important;
+  }
+
+  h1 { font-size: 16px !important; margin: 0 0 2px 0 !important; }
+  h2 { font-size: 13px !important; margin: 0 0 2px 0 !important; }
+
+  /* 6. Optimized Table Padding (2px vertical tightens the 15-row table perfectly) */
+  table td, table th {
+    padding: 2px 4px !important; 
+    line-height: 1.15 !important;
+  }
+
+  /* 7. Flatten inputs */
+  input, select {
+    border: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    height: auto !important;
+    font-size: inherit !important;
+    -webkit-appearance: none;
+  }
+
+  /* 8. Force the stamp to stick to the section above it */
+  .section, .stamp {
+    page-break-before: avoid !important;
+  }
+  
+  .panel, .stamp, .rows, .sizing, .sheet {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 }

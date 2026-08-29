@@ -62,7 +62,7 @@ export default function App() {
 
     const fetchPriceLists = async () => {
       try {
-        const response = await fetch("http://localhost:5000/api/pricelists");
+        const response = await fetch("/api/pricelists");
         const dbLists = await response.json();
         
         if (dbLists && dbLists.length > 0) {
@@ -154,7 +154,7 @@ export default function App() {
     
     try {
       if (activeListIndex === -1) {
-        const response = await fetch("http://localhost:5000/api/pricelists", {
+        const response = await fetch("/api/pricelists", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ name: savedName, rates: draft.chalni_rate })
@@ -176,7 +176,7 @@ export default function App() {
             return;
         }
 
-        const response = await fetch(`http://localhost:5000/api/pricelists/${listToUpdate._id}`, {
+        const response = await fetch(`/api/pricelists/${listToUpdate._id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ name: savedName, rates: draft.chalni_rate })
@@ -203,7 +203,7 @@ export default function App() {
 
   // --- DELETE LOGIC ---
   const deleteActiveList = async () => {
-    if (activeListIndex === -1) return; // Can't delete "Create new"
+    if (activeListIndex === -1) return; 
 
     const listToDelete = priceLists[activeListIndex];
     
@@ -217,7 +217,7 @@ export default function App() {
     }
 
     try {
-      const response = await fetch(`http://localhost:5000/api/pricelists/${listToDelete._id}`, {
+      const response = await fetch(`/api/pricelists/${listToDelete._id}`, {
         method: "DELETE"
       });
 
@@ -226,17 +226,14 @@ export default function App() {
         throw new Error(data.message || "Failed to delete list");
       }
 
-      // Remove from state
       const newLists = priceLists.filter((_, idx) => idx !== activeListIndex);
       setPriceLists(newLists);
 
-      // Adjust active index
       if (newLists.length > 0) {
         setActiveListIndex(0);
         setActiveListName(newLists[0].name);
         setDraft(prev => ({ ...prev, chalni_rate: [...newLists[0].rates] }));
       } else {
-        // If all lists are deleted, revert to "Create new" mode
         setActiveListIndex(-1);
         setActiveListName("");
       }
@@ -496,8 +493,8 @@ export default function App() {
         </div>
       </div>
 
-      {/* ---- CHALNI SIZING PANEL ---- */}
-      <div className="section page-break">
+      {/* ---- CHALNI SIZING PANEL (REMOVED page-break CLASS) ---- */}
+      <div className="section">
         <div className="section-head">
           <span className="idx">02</span>
           <h2>Polki sizing ledger</h2>
