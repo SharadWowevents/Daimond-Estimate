@@ -153,6 +153,7 @@ export default function App() {
     }
     
     try {
+      // If it's -1, it's explicitly a NEW list creation
       if (activeListIndex === -1) {
         const response = await fetch("/api/pricelists", {
           method: "POST",
@@ -171,24 +172,35 @@ export default function App() {
       } else {
         const listToUpdate = priceLists[activeListIndex];
         
-        if (!listToUpdate._id) {
-            setToast("Error: Missing database ID.");
-            return;
+        // Guard check if listToUpdate is missing
+        if (!listToUpdate) {
+          // Fallback to creating a new list if index is out of bounds
+          const response = await fetch("/api/pricelists", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: savedName, rates: draft.chalni_rate })
+          });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.message || "Failed to create list");
+          const newLists = [...priceLists, data];
+          setPriceLists(newLists);
+          setActiveListIndex(newLists.length - 1);
+          setActiveListName(data.name);
+        } else {
+          const response = await fetch(`/api/pricelists/${listToUpdate._id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: savedName, rates: draft.chalni_rate })
+          });
+          
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.message || "Failed to update list");
+          
+          const newLists = [...priceLists];
+          newLists[activeListIndex] = data;
+          setPriceLists(newLists);
+          setActiveListName(data.name);
         }
-
-        const response = await fetch(`/api/pricelists/${listToUpdate._id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: savedName, rates: draft.chalni_rate })
-        });
-        
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.message || "Failed to update list");
-        
-        const newLists = [...priceLists];
-        newLists[activeListIndex] = data;
-        setPriceLists(newLists);
-        setActiveListName(data.name);
       }
 
       setToast("Rates saved successfully!");
@@ -200,7 +212,6 @@ export default function App() {
       setTimeout(() => setToast(""), 3000);
     }
   };
-
   // --- DELETE LOGIC ---
   const deleteActiveList = async () => {
     if (activeListIndex === -1) return; 
